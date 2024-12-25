@@ -1,31 +1,31 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
 }
-
+kotlin {
+    jvmToolchain(21)
+}
 android {
-    compileSdk = 33
+    compileSdk = 34
     defaultConfig {
         minSdk = 21
-        targetSdk = 33
     }
     namespace = "com.junkfood.seal.color"
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.androidxComposeCompiler.get()
-    }
-    buildFeatures {
-        compose = true
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_1_8
     }
     buildTypes {
-        debug {
-            isMinifyEnabled = true
-        }
         release {
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            )
             isMinifyEnabled = true
         }
     }
@@ -37,5 +37,4 @@ dependencies {
     api(libs.androidx.core.ktx)
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.material3)
-
 }

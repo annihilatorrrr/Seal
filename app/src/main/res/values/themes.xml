@@ -1,6 +1,8 @@
 <resources>
 
     <style name="Theme.Seal" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
     <style name="Theme.Seal.Dialog" parent="Theme.Material3.DayNight.NoActionBar">
@@ -10,4 +12,5 @@
         <item name="android:colorBackgroundCacheHint">@null</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
+
 </resources>

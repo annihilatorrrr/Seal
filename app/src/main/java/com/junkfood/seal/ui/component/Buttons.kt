@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -21,7 +22,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,61 +38,47 @@ import androidx.compose.ui.unit.dp
 import com.junkfood.seal.R
 import com.junkfood.seal.ui.page.settings.general.ytdlpReference
 
-
 @Composable
 fun OutlinedButtonWithIcon(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     icon: ImageVector,
     text: String,
-    contentColor:Color = MaterialTheme.colorScheme.primary
+    contentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     OutlinedButton(
         modifier = modifier,
         onClick = onClick,
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor)
-    )
-    {
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
+    ) {
         Icon(
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(ButtonDefaults.IconSize),
             imageVector = icon,
-            contentDescription = null
+            contentDescription = null,
         )
-        Text(
-            modifier = Modifier.padding(start = 8.dp),
-            text = text
-        )
+        Text(modifier = Modifier.padding(start = 8.dp), text = text)
     }
 }
 
 @Composable
 fun TextButtonWithIcon(
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
     icon: ImageVector,
     text: String,
-    contentColor: Color = MaterialTheme.colorScheme.primary
+    contentColor: Color = MaterialTheme.colorScheme.primary,
+    onClick: () -> Unit,
 ) {
     TextButton(
         modifier = modifier,
         onClick = onClick,
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        colors = ButtonDefaults.textButtonColors(contentColor = contentColor)
-    )
-    {
+        colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                modifier = Modifier.size(18.dp),
-                imageVector = icon,
-                contentDescription = null
-            )
-            Text(
-                modifier = Modifier.padding(start = 8.dp),
-                text = text
-            )
+            Icon(modifier = Modifier.size(18.dp), imageVector = icon, contentDescription = null)
+            Text(modifier = Modifier.padding(start = 8.dp), text = text)
         }
-
     }
 }
 
@@ -101,48 +87,36 @@ fun FilledTonalButtonWithIcon(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     icon: ImageVector,
-    text: String
+    text: String,
+    colors: ButtonColors = ButtonDefaults.filledTonalButtonColors(),
 ) {
     FilledTonalButton(
         modifier = modifier,
         onClick = onClick,
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-    )
-    {
-        Icon(
-            modifier = Modifier.size(18.dp),
-            imageVector = icon,
-            contentDescription = null
-        )
-        Text(
-            modifier = Modifier.padding(start = 8.dp),
-            text = text
-        )
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+        colors = colors,
+    ) {
+        Icon(modifier = Modifier.size(18.dp), imageVector = icon, contentDescription = null)
+        Text(modifier = Modifier.padding(start = 8.dp), text = text)
     }
 }
 
 @Composable
 fun FilledButtonWithIcon(
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
     icon: ImageVector,
-    text: String
+    text: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
 ) {
     Button(
         modifier = modifier,
         onClick = onClick,
-        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-    )
-    {
-        Icon(
-            modifier = Modifier.size(18.dp),
-            imageVector = icon,
-            contentDescription = null
-        )
-        Text(
-            modifier = Modifier.padding(start = 6.dp),
-            text = text
-        )
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+        enabled = enabled,
+    ) {
+        Icon(modifier = Modifier.size(18.dp), imageVector = icon, contentDescription = null)
+        Text(modifier = Modifier.padding(start = 6.dp), text = text)
     }
 }
 
@@ -150,18 +124,28 @@ fun FilledButtonWithIcon(
 fun ConfirmButton(
     text: String = stringResource(R.string.confirm),
     enabled: Boolean = true,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    TextButton(onClick = onClick, enabled = enabled) {
-        Text(text)
-    }
+    TextButton(onClick = onClick, enabled = enabled) { Text(text) }
 }
 
 @Composable
 fun DismissButton(text: String = stringResource(R.string.dismiss), onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Text(text)
-    }
+    TextButton(onClick = onClick) { Text(text) }
+}
+
+@Composable
+fun OutlinedDismissButton(text: String = stringResource(R.string.dismiss), onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick) { Text(text) }
+}
+
+@Composable
+fun FilledConfirmButton(
+    text: String = stringResource(R.string.confirm),
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Button(onClick = onClick, enabled = enabled) { Text(text) }
 }
 
 @Composable
@@ -169,14 +153,14 @@ fun LinkButton(
     modifier: Modifier = Modifier,
     text: String = stringResource(R.string.yt_dlp_docs),
     icon: ImageVector = Icons.Outlined.OpenInNew,
-    link: String = ytdlpReference
+    link: String = ytdlpReference,
 ) {
     val uriHandler = LocalUriHandler.current
     TextButtonWithIcon(
         modifier = modifier,
         onClick = { uriHandler.openUri(link) },
         icon = icon,
-        text = text
+        text = text,
     )
 }
 
@@ -191,36 +175,33 @@ fun LongTapTextButton(
     shape: Shape = ButtonDefaults.shape,
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ButtonWithIconContentPadding,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val contentColor = MaterialTheme.colorScheme.primary
-    Surface(
-        modifier = modifier
-            .clip(shape)
-            .combinedClickable(
-                onClick = onClick,
-                onClickLabel = onClickLabel,
-                onLongClick = onLongClick,
-                onLongClickLabel = onLongClickLabel
-            ),
-        contentColor = contentColor,
-        border = border,
+    Row(
+        modifier =
+            modifier
+                .clip(shape)
+                .combinedClickable(
+                    onClick = onClick,
+                    onClickLabel = onClickLabel,
+                    onLongClick = onLongClick,
+                    onLongClickLabel = onLongClickLabel,
+                )
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             ProvideTextStyle(value = MaterialTheme.typography.labelLarge) {
                 Row(
-                    Modifier
-                        .defaultMinSize(
+                    Modifier.defaultMinSize(
                             minWidth = ButtonDefaults.MinWidth,
-                            minHeight = ButtonDefaults.MinHeight
+                            minHeight = ButtonDefaults.MinHeight,
                         )
                         .padding(contentPadding),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
-                    content = content
+                    content = content,
                 )
             }
         }
     }
-
 }

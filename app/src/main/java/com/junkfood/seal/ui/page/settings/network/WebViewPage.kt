@@ -3,6 +3,7 @@ package com.junkfood.seal.ui.page.settings.network
 import android.annotation.SuppressLint
 import android.util.Log
 import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -25,9 +26,10 @@ import com.google.accompanist.web.AccompanistWebChromeClient
 import com.google.accompanist.web.AccompanistWebViewClient
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
-import com.junkfood.seal.R
+import com.google.android.material.R
+import com.junkfood.seal.util.PreferenceUtil.updateString
+import com.junkfood.seal.util.USER_AGENT_STRING
 import com.junkfood.seal.util.connectWithDelimiter
-
 
 private const val TAG = "WebViewPage"
 
@@ -43,7 +45,7 @@ data class Cookie(
     constructor(
         url: String,
         name: String,
-        value: String
+        value: String,
     ) : this(domain = url.toDomain(), name = name, value = value)
 
     fun toNetscapeCookieString(): String {
@@ -55,13 +57,13 @@ data class Cookie(
             expiry.toString(),
             name,
             value,
-            delimiter = "\u0009"
+            delimiter = "\u0009",
         )
     }
 }
 
-
 private val domainRegex = Regex("""http(s)?://(\w*(www|m|account|sso))?|/.*""")
+
 private fun String.toDomain(): String {
     return this.replace(domainRegex, "")
 }
@@ -75,75 +77,72 @@ private fun makeCookie(url: String, cookieString: String): Cookie {
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WebViewPage(
-    cookiesViewModel: CookiesViewModel,
-    onDismissRequest: () -> Unit
-) {
+fun WebViewPage(cookiesViewModel: CookiesViewModel, onDismissRequest: () -> Unit) {
 
     val state by cookiesViewModel.stateFlow.collectAsStateWithLifecycle()
     Log.d(TAG, state.editingCookieProfile.url)
-
 
     val cookieManager = CookieManager.getInstance()
     val cookieSet = remember { mutableSetOf<Cookie>() }
     val websiteUrl = state.editingCookieProfile.url
     val webViewState = rememberWebViewState(websiteUrl)
 
-    val onConfirmationCallback: () -> Unit = {
-        cookieManager.flush()
-    }
-
-    Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
-        TopAppBar(
-            title = { Text(webViewState.pageTitle.toString(), maxLines = 1) },
-            navigationIcon = {
-                IconButton(
-                    onClick = { onDismissRequest() }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        stringResource(id = R.string.close)
-                    )
-                }
-            },
-            actions = {
-                TextButton(onClick = {
-                    onConfirmationCallback()
-                    onDismissRequest()
-                }) {
-                    Text(stringResource(androidx.appcompat.R.string.abc_action_mode_done))
-                }
-            })
-    }) { paddingValues ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(webViewState.pageTitle.toString(), maxLines = 1) },
+                navigationIcon = {
+                    IconButton(onClick = { onDismissRequest() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            stringResource(id = androidx.appcompat.R.string.abc_action_mode_done),
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onDismissRequest) {
+                        Text(text = stringResource(id = R.string.abc_action_mode_done))
+                    }
+                },
+            )
+        },
+    ) { paddingValues ->
         val webViewClient = remember {
             object : AccompanistWebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
+                override fun onPageFinished(view: WebView, url: String?) {
                     super.onPageFinished(view, url)
                     if (url.isNullOrEmpty()) return
                 }
-            }
 
-        }
-        val webViewChromeClient = remember {
-            object : AccompanistWebChromeClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                ): Boolean {
+                    return if (request?.url?.scheme?.contains("http") == true)
+                        super.shouldOverrideUrlLoading(view, request)
+                    else true
+                }
             }
         }
+        val webViewChromeClient = remember { object : AccompanistWebChromeClient() {} }
         WebView(
-            state = webViewState, client = webViewClient, chromeClient = webViewChromeClient,
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
-            captureBackPresses = true, factory = { context ->
+            state = webViewState,
+            client = webViewClient,
+            chromeClient = webViewChromeClient,
+            modifier = Modifier.padding(paddingValues).fillMaxSize(),
+            captureBackPresses = true,
+            factory = { context ->
                 WebView(context).apply {
                     settings.run {
                         javaScriptCanOpenWindowsAutomatically = true
                         javaScriptEnabled = true
                         domStorageEnabled = true
+                        USER_AGENT_STRING.updateString(userAgentString)
                     }
                     cookieManager.setAcceptThirdPartyCookies(this, true)
                 }
-            }
+            },
         )
-
-
     }
 }

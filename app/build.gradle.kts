@@ -1,64 +1,38 @@
+@file:Suppress("UnstableApiUsage")
+
+import com.android.build.api.variant.FilterConfiguration
 import java.io.FileInputStream
 import java.util.Properties
 
 plugins {
-    id("com.android.application")
-    id("kotlin-android")
-    id("kotlin-kapt")
-    id("org.jetbrains.kotlin.android")
-    kotlin("plugin.serialization")
-}
-apply(plugin = "dagger.hilt.android.plugin")
-
-sealed class Version(
-    open val versionMajor: Int,
-    val versionMinor: Int,
-    val versionPatch: Int,
-    val versionBuild: Int = 0
-) {
-    abstract fun toVersionName(): String
-    class Beta(versionMajor: Int, versionMinor: Int, versionPatch: Int, versionBuild: Int) :
-        Version(versionMajor, versionMinor, versionPatch, versionBuild) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}-beta.$versionBuild"
-    }
-
-    class Stable(versionMajor: Int, versionMinor: Int, versionPatch: Int) :
-        Version(versionMajor, versionMinor, versionPatch) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}"
-    }
-
-    class ReleaseCandidate(
-        versionMajor: Int,
-        versionMinor: Int,
-        versionPatch: Int,
-        versionBuild: Int
-    ) :
-        Version(versionMajor, versionMinor, versionPatch, versionBuild) {
-        override fun toVersionName(): String =
-            "${versionMajor}.${versionMinor}.${versionPatch}-rc.$versionBuild"
-    }
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.room)
+    alias(libs.plugins.ktfmt.gradle)
 }
 
-val currentVersion: Version = Version.Beta(
-    versionMajor = 1,
-    versionMinor = 9,
-    versionPatch = 0,
-    versionBuild = 2
-)
-
-val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystorePropertiesFile: File = rootProject.file("keystore.properties")
 
 val splitApks = !project.hasProperty("noSplits")
 
+val abiFilterList = (properties["ABI_FILTERS"] as String).split(';')
+
+val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
+
+val baseVersionName = currentVersion.name
+val currentVersionCode = currentVersion.code.toInt()
+
 android {
+    compileSdk = 35
+
     if (keystorePropertiesFile.exists()) {
         val keystoreProperties = Properties()
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
         signingConfigs {
-            getByName("debug")
-            {
+            create("githubPublish") {
                 keyAlias = keystoreProperties["keyAlias"].toString()
                 keyPassword = keystoreProperties["keyPassword"].toString()
                 storeFile = file(keystoreProperties["storeFile"]!!)
@@ -67,72 +41,100 @@ android {
         }
     }
 
-    compileSdk = 33
+    buildFeatures { buildConfig = true }
+
     defaultConfig {
         applicationId = "com.junkfood.seal"
-        minSdk = 21
-        targetSdk = 33
-        versionCode = 10820
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 200_000_150
+        check(versionCode == currentVersionCode)
 
-        versionName = currentVersion.toVersionName().run {
-            if (!splitApks) "$this-(F-Droid)"
-            else this
-        }
+        versionName = baseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-        kapt {
-            arguments {
-                arg("room.schemaLocation", "$projectDir/schemas")
-            }
-            correctErrorTypes = true
-        }
-        if (!splitApks)
-            ndk {
-                (properties["ABI_FILTERS"] as String).split(';').forEach {
-                    abiFilters.add(it)
+        vectorDrawables { useSupportLibrary = true }
+
+        if (splitApks) {
+            splits {
+                abi {
+                    isEnable = true
+                    reset()
+                    include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+                    isUniversalApk = true
                 }
             }
+        } else {
+            ndk { abiFilters.addAll(abiFilterList) }
+        }
     }
-    if (splitApks)
-        splits {
-            abi {
-                isEnable = !project.hasProperty("noSplits")
-                reset()
-                include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-                isUniversalApk = false
+
+    room { schemaDirectory("$projectDir/schemas") }
+    ksp { arg("room.incremental", "true") }
+
+    androidComponents {
+        onVariants { variant ->
+            variant.outputs.forEach { output ->
+                val name =
+                    if (splitApks) {
+                        output.filters
+                            .find { it.filterType == FilterConfiguration.FilterType.ABI }
+                            ?.identifier
+                    } else {
+                        abiFilterList.firstOrNull()
+                    }
+
+                val baseAbiCode = abiCodes[name]
+
+                if (baseAbiCode != null) {
+                    output.versionCode.set(baseAbiCode + (output.versionCode.get() ?: 0))
+                }
             }
         }
+    }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
             )
-            if (keystorePropertiesFile.exists())
-                signingConfig = signingConfigs.getByName("debug")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("githubPublish")
+            }
         }
         debug {
-            if (keystorePropertiesFile.exists())
-                signingConfig = signingConfigs.getByName("debug")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("githubPublish")
+            }
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Seal Debug")
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-    buildFeatures {
-        compose = true
+
+    flavorDimensions += "publishChannel"
+
+    productFlavors {
+        create("generic") {
+            dimension = "publishChannel"
+            isDefault = true
+        }
+
+        create("githubPreview") {
+            dimension = "publishChannel"
+            applicationIdSuffix = ".preview"
+            resValue("string", "app_name", "Seal Preview")
+        }
+
+        create("fdroid") {
+            dimension = "publishChannel"
+            versionName = "$baseVersionName-(F-Droid)"
+        }
     }
 
-    lint {
-        disable.addAll(listOf("MissingTranslation", "ExtraTranslation"))
-    }
+    lint { disable.addAll(listOf("MissingTranslation", "ExtraTranslation", "MissingQuantity")) }
 
     applicationVariants.all {
         outputs.all {
@@ -141,88 +143,51 @@ android {
         }
     }
 
-    kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn"
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.androidxComposeCompiler.get()
-    }
-    packagingOptions {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
+    kotlinOptions { freeCompilerArgs = freeCompilerArgs + "-opt-in=kotlin.RequiresOptIn" }
+
+    packaging {
+        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
         jniLibs.useLegacyPackaging = true
     }
+    androidResources { generateLocaleConfig = true }
+
     namespace = "com.junkfood.seal"
 }
 
-dependencies {
+ktfmt { kotlinLangStyle() }
 
+kotlin { jvmToolchain(21) }
+
+dependencies {
     implementation(project(":color"))
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.android.material)
-    implementation(libs.androidx.activity.compose)
+
+    implementation(libs.bundles.core)
 
     implementation(libs.androidx.lifecycle.runtimeCompose)
-    implementation(libs.androidx.lifecycle.viewModelCompose)
 
     implementation(platform(libs.androidx.compose.bom))
-
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material)
-    implementation(libs.androidx.compose.material.iconsExtended)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material3.windowSizeClass)
-    implementation(libs.androidx.compose.foundation)
-
-
-    implementation(libs.androidx.navigation.compose)
-
-    implementation(libs.accompanist.systemuicontroller)
-    implementation(libs.accompanist.permissions)
-    implementation(libs.accompanist.navigation.animation)
-    implementation(libs.accompanist.webview)
-    implementation(libs.accompanist.pager.layouts)
-    implementation(libs.accompanist.pager.indicators)
-    implementation(libs.accompanist.flowlayout)
+    implementation(libs.bundles.androidxCompose)
+    implementation(libs.bundles.accompanist)
 
     implementation(libs.coil.kt.compose)
 
     implementation(libs.kotlinx.serialization.json)
 
-    implementation(libs.androidx.hilt.navigation.compose)
-    kapt(libs.hilt.ext.compiler)
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    implementation(libs.koin.android)
+    implementation(libs.koin.compose)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    kapt(libs.room.compiler)
+    ksp(libs.room.compiler)
 
-    // okhttp
     implementation(libs.okhttp)
 
-    implementation(libs.youtubedl.android.library)
-    implementation(libs.youtubedl.android.ffmpeg)
-    implementation(libs.youtubedl.android.aria2c)
-
-//    implementation("com.github.xibr.youtubedl-android:library:$youtubedlAndroidVersion")
-//    implementation("com.github.xibr.youtubedl-android:ffmpeg:$youtubedlAndroidVersion")
-//    implementation("com.github.xibr.youtubedl-android:aria2c:$youtubedlAndroidVersion")
-
-//    implementation("com.github.JunkFood02.youtubedl-android:ffmpeg:-SNAPSHOT")
-//    implementation("com.github.JunkFood02.youtubedl-android:library:-SNAPSHOT")
+    implementation(libs.bundles.youtubedlAndroid)
 
     implementation(libs.mmkv)
-
 
     testImplementation(libs.junit4)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.espresso.core)
-//    androidTestImplementation(libs.androidx.compose.ui.test)
-
-    debugImplementation(libs.androidx.compose.ui.tooling)
-
+    implementation(libs.androidx.compose.ui.tooling)
 }
